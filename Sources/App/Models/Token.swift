@@ -5,7 +5,6 @@
 //  Created by Roa Moha on 28/03/1445 AH.
 //
 
-import Foundation
 import Vapor
 import Fluent
 
@@ -15,7 +14,7 @@ enum SessionSource: Int, Content {
 }
 
 
-final class Token: Model {
+final class Token: Model , Content {
     
     static let schema = "tokens"
     
