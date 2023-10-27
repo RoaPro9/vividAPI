@@ -42,10 +42,33 @@ final class User: Model {
   }
 }
 
-extension User {
+extension User : ModelAuthenticatable {
+    static let usernameKey = \User.$username
+     static let passwordHashKey = \User.$passwordHash
+     
+     // 2
+     func verify(password: String) throws -> Bool {
+       try Bcrypt.verify(password, created: self.passwordHash)
+     }
+    
   static func create(from userSignup: UserSignup) throws -> User {
-    throw Abort(.notImplemented)
+    throw  User(username: userSignup.username,
+                passwordHash: try Bcrypt.hash(userSignup.password)) as! Error
   }
+    
+    
+    
+    func createToken(source: SessionSource) throws -> Token {
+      let calendar = Calendar(identifier: .gregorian)
+      // 2
+      let expiryDate = calendar.date(byAdding: .year, value: 1, to: Date())
+      // 3
+      return try Token(userId: requireID(),
+        //4
+        token: [UInt8].random(count: 16).base64, source: source,
+        expiresAt: expiryDate)
+    }
+
 
   func asPublic() throws -> Public {
     Public(username: username,

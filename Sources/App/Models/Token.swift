@@ -50,3 +50,17 @@ final class Token: Model , Content {
       self.expiresAt = expiresAt
     }
 }
+extension Token: ModelTokenAuthenticatable {
+  //1
+  static let valueKey = \Token.$value
+  static let userKey = \Token.$user
+
+  //2
+  var isValid: Bool {
+    guard let expiryDate = expiresAt else {
+      return true
+    }
+    
+    return expiryDate > Date()
+  }
+}

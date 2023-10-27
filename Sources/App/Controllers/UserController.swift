@@ -30,9 +30,17 @@ struct UserController: RouteCollection {
   func boot(routes: RoutesBuilder) throws {
     let usersRoute = routes.grouped("users")
     usersRoute.post("signup", use: create)
+      let tokenProtected = usersRoute.grouped(Token.authenticator())
+      tokenProtected.get("me", use: getMyOwnUser)
+      let passwordProtected =
+        usersRoute.grouped(User.authenticator())
+      passwordProtected.post("login", use: login)
+
+
   }
 
-   func create(req: Request) throws -> EventLoopFuture<User.Public> {
+   func create(req: Request) throws -> EventLoopFuture<NewSession>
+ { var token: Token!
     try UserSignup.validate(req)
        var userSignup = try req.content.decode(UserSignup.self)
     
@@ -48,17 +56,37 @@ struct UserController: RouteCollection {
       }
         print("2")
       return user.save(on: req.db)
-    }.flatMapThrowing {
-      try user.asPublic()
-    }
+    }.flatMap {
+        // 1
+        guard let newToken = try? user.createToken(source: .signup) else {
+          return req.eventLoop.future(error: Abort(.internalServerError))
+        }
+        // 2
+        token = newToken
+        return token.save(on: req.db)
+      }.flatMapThrowing {
+        // 3
+        NewSession(token: token.value, user: try user.asPublic())
+      }
+
   }
 
   fileprivate func login(req: Request) throws -> EventLoopFuture<NewSession> {
-    throw Abort(.notImplemented)
+      let user = try req.auth.require(User.self)
+      // 2
+      let token = try user.createToken(source: .login)
+
+      return token
+        .save(on: req.db)
+        // 3
+        .flatMapThrowing {
+          NewSession(token: token.value, user: try user.asPublic())
+      }
   }
 
   func getMyOwnUser(req: Request) throws -> User.Public {
-    throw Abort(.notImplemented)
+     try req.auth.require(User.self).asPublic()
+
   }
 
   private func checkIfUserExists(_ username: String, req: Request) -> EventLoopFuture<Bool> {
